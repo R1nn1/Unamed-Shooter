@@ -51,7 +51,7 @@ tab.newToggle("HitBox", "Changes the hitbox of other players", true, function(to
     end
 end)
 
-tab.newSlider("HitBox Slider", "Lets you change how big other players hitbox are", 25, false, function(num)
+tab.newSlider("HitBox Slider", "Lets you change how big other players hitbox are", 20, false, function(num)
     getgenv().HitboxSize = num
     print("Hitbox size:", num)
 end)
