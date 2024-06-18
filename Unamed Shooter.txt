@@ -2,9 +2,13 @@ local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 
 local window = DrRayLibrary:Load("Rinns Hub", "Default")
 
-local tab = DrRayLibrary.newTab("Main Tab", "ImageIdHere")
+local mainTab = DrRayLibrary.newTab("Main Tab", "ImageIdHere")
+local espTab = DrRayLibrary.newTab("ESP Tab", "ImageIdHere")
+local playerTab = DrRayLibrary.newTab("Player Tab", "ImageIdHere")
 
 local hitboxEnabled = false
+local espEnabled = false
+local lowGravityEnabled = false
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.5
@@ -13,7 +17,7 @@ getgenv().HitboxTransparency = 0.5
 local function updateHitbox()
     game:GetService('RunService').RenderStepped:Connect(function()
         if hitboxEnabled then
-            for i, v in next, game:GetService('Players'):GetPlayers() do
+            for _, v in next, game:GetService('Players'):GetPlayers() do
                 if v.Name ~= game:GetService('Players').LocalPlayer.Name then
                     pcall(function()
                         v.Character.HumanoidRootPart.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
@@ -25,7 +29,7 @@ local function updateHitbox()
                 end
             end
         else
-            for i, v in next, game:GetService('Players'):GetPlayers() do
+            for _, v in next, game:GetService('Players'):GetPlayers() do
                 if v.Name ~= game:GetService('Players').LocalPlayer.Name then
                     pcall(function()
                         v.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
@@ -40,7 +44,7 @@ local function updateHitbox()
     end)
 end
 
-tab.newToggle("HitBox", "Changes the hitbox of other players", true, function(toggleState)
+mainTab.newToggle("HitBox", "Changes the hitbox of other players", true, function(toggleState)
     hitboxEnabled = toggleState
     getgenv().HitboxStatus = toggleState
     if toggleState then
@@ -51,9 +55,88 @@ tab.newToggle("HitBox", "Changes the hitbox of other players", true, function(to
     end
 end)
 
-tab.newSlider("HitBox Slider", "Lets you change how big other players hitbox are", 20, false, function(num)
+mainTab.newSlider("HitBox Slider", "Lets you change how big other players hitbox are", 20, false, function(num)
     getgenv().HitboxSize = num
     print("Hitbox size:", num)
+end)
+
+-- ESP function
+local function addHighlight(player)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "HighlightESP"
+        highlight.FillColor = Color3.new(1, 0, 0)
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.Parent = player.Character.HumanoidRootPart
+    end
+end
+
+local function removeHighlight(player)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart:FindFirstChild("HighlightESP") then
+        player.Character.HumanoidRootPart.HighlightESP:Destroy()
+    end
+end
+
+local function updateESP()
+    for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
+        if player ~= game:GetService('Players').LocalPlayer then
+            if espEnabled then
+                addHighlight(player)
+            else
+                removeHighlight(player)
+            end
+        end
+    end
+end
+
+-- Player added/removed connection
+game:GetService('Players').PlayerAdded:Connect(function(player)
+    if espEnabled then
+        player.CharacterAdded:Connect(function()
+            wait(1)
+            addHighlight(player)
+        end)
+    end
+end)
+
+game:GetService('Players').PlayerRemoving:Connect(function(player)
+    removeHighlight(player)
+end)
+
+espTab.newToggle("Highlight ESP", "Highlights all players", true, function(toggleState)
+    espEnabled = toggleState
+    getgenv().ESPStatus = toggleState
+    if toggleState then
+        print("ESP On")
+    else
+        print("ESP Off")
+    end
+    updateESP()
+end)
+
+-- Walkspeed function
+playerTab.newSlider("WalkSpeed Slider", "Change your walk speed", 500, false, function(speed)
+    game:GetService('Players').LocalPlayer.Character.Humanoid.WalkSpeed = speed
+    print("Walk speed:", speed)
+end)
+
+-- Low gravity function
+local function setLowGravity(enabled)
+    if enabled then
+        game:GetService('Workspace').Gravity = 50
+        print("Low gravity enabled")
+    else
+        game:GetService('Workspace').Gravity = 196.2
+        print("Low gravity disabled")
+    end
+end
+
+playerTab.newToggle("Low Gravity", "Enable/Disable low gravity", false, function(toggleState)
+    lowGravityEnabled = toggleState
+    getgenv().LowGravityStatus = toggleState
+    setLowGravity(toggleState)
 end)
 
 print("Script loaded successfully")
