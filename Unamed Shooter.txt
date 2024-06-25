@@ -8,7 +8,10 @@ local playerTab = DrRayLibrary.newTab("Player Tab", "ImageIdHere")
 
 local hitboxEnabled = false
 local espEnabled = false
+local aimbotEnabled = false
+local wallCheckEnabled = false
 local lowGravityEnabled = false
+local tracerEnabled = false
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.5
@@ -18,7 +21,7 @@ local function updateHitbox()
     game:GetService('RunService').RenderStepped:Connect(function()
         if hitboxEnabled then
             for _, v in next, game:GetService('Players'):GetPlayers() do
-                if v.Name ~= game:GetService('Players').LocalPlayer.Name then
+                if v.Name ~= game:GetService('Players').LocalPlayer.Name and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
                     pcall(function()
                         v.Character.HumanoidRootPart.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
                         v.Character.HumanoidRootPart.Transparency = getgenv().HitboxTransparency
@@ -30,7 +33,7 @@ local function updateHitbox()
             end
         else
             for _, v in next, game:GetService('Players'):GetPlayers() do
-                if v.Name ~= game:GetService('Players').LocalPlayer.Name then
+                if v.Name ~= game:GetService('Players').LocalPlayer.Name and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
                     pcall(function()
                         v.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
                         v.Character.HumanoidRootPart.Transparency = 1
@@ -43,6 +46,75 @@ local function updateHitbox()
         end
     end)
 end
+
+local function createCircle()
+    local circle = Drawing.new("Circle")
+    circle.Thickness = 2
+    circle.NumSides = 30
+    circle.Radius = 100
+    circle.Color = Color3.new(1, 1, 1)
+    circle.Transparency = 0.4
+    circle.Filled = false
+
+    game:GetService('RunService').RenderStepped:Connect(function()
+        if aimbotEnabled then
+            circle.Position = Vector2.new(game:GetService('Workspace').CurrentCamera.ViewportSize.X / 2, game:GetService('Workspace').CurrentCamera.ViewportSize.Y / 2)
+            circle.Visible = true
+        else
+            circle.Visible = false
+        end
+    end)
+end
+
+createCircle()
+
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = 100
+
+    for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
+        if player ~= game:GetService('Players').LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            if not game:GetService('Players').LocalPlayer.Team or player.Team ~= game:GetService('Players').LocalPlayer.Team then
+                local pos = game:GetService('Workspace').CurrentCamera:WorldToScreenPoint(player.Character.HumanoidRootPart.Position)
+                local distance = (Vector2.new(pos.X, pos.Y) - Vector2.new(game:GetService('Workspace').CurrentCamera.ViewportSize.X/2, game:GetService('Workspace').CurrentCamera.ViewportSize.Y/2)).magnitude
+                
+                if distance < shortestDistance then
+                    if wallCheckEnabled then
+                        local ray = Ray.new(game:GetService('Workspace').CurrentCamera.CFrame.Position, (player.Character.HumanoidRootPart.Position - game:GetService('Workspace').CurrentCamera.CFrame.Position).unit * 1000)
+                        local hit, pos = game:GetService('Workspace'):FindPartOnRay(ray, game:GetService('Players').LocalPlayer.Character, false, true)
+                        
+                        if hit and hit:IsDescendantOf(player.Character) then
+                            closestPlayer = player
+                            shortestDistance = distance
+                        end
+                    else
+                        closestPlayer = player
+                        shortestDistance = distance
+                    end
+                end
+            end
+        end
+    end
+    
+    return closestPlayer
+end
+
+local function aimAt(target)
+    local camera = game:GetService('Workspace').CurrentCamera
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPos = target.Character.HumanoidRootPart.Position
+        camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+    end
+end
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    if aimbotEnabled then
+        local target = getClosestPlayer()
+        if target then
+            aimAt(target)
+        end
+    end
+end)
 
 mainTab.newToggle("HitBox", "Changes the hitbox of other players", true, function(toggleState)
     hitboxEnabled = toggleState
@@ -58,6 +130,24 @@ end)
 mainTab.newSlider("HitBox Slider", "Lets you change how big other players hitbox are", 20, false, function(num)
     getgenv().HitboxSize = num
     print("Hitbox size:", num)
+end)
+
+mainTab.newToggle("Aimbot", "Locks your camera on to players in the circle", true, function(toggleState)
+    aimbotEnabled = toggleState
+    if toggleState then
+        print("Aimbot On")
+    else
+        print("Aimbot Off")
+    end
+end)
+
+mainTab.newToggle("Wall Check", "Makes the aimbot check if players are behind a wall", true, function(toggleState)
+    wallCheckEnabled = toggleState
+    if toggleState then
+        print("Wall Check On")
+    else
+        print("Wall Check Off")
+    end
 end)
 
 -- ESP function
@@ -91,7 +181,6 @@ local function updateESP()
     end
 end
 
--- Player added/removed connection
 game:GetService('Players').PlayerAdded:Connect(function(player)
     if espEnabled then
         player.CharacterAdded:Connect(function()
@@ -114,6 +203,84 @@ espTab.newToggle("Highlight ESP", "Highlights all players", true, function(toggl
         print("ESP Off")
     end
     updateESP()
+end)
+
+-- Tracers function
+local tracers = {}
+
+local function createTracer(player)
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local tracer = Drawing.new("Line")
+    tracer.Visible = false
+    tracer.Color = Color3.new(1, 0, 0)
+    tracer.Thickness = 2
+    tracer.Transparency = 1
+    
+    tracers[player] = tracer
+
+    local function updateTracer()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            local camera = game:GetService("Workspace").CurrentCamera
+            local screenPoint = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            tracer.From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y)
+            tracer.To = Vector2.new(screenPoint.X, screenPoint.Y)
+            tracer.Visible = tracerEnabled and player.Character.Humanoid.Health > 0
+        else
+            tracer.Visible = false
+        end
+    end
+
+    game:GetService("RunService").RenderStepped:Connect(updateTracer)
+
+    player.CharacterAdded:Connect(function()
+        wait(1)
+        updateTracer()
+        player.Character:WaitForChild("Humanoid").Died:Connect(function()
+            tracer.Visible = false
+        end)
+    end)
+end
+
+local function removeTracer(player)
+    if tracers[player] then
+        tracers[player].Visible = false
+        tracers[player] = nil
+    end
+end
+
+local function updateTracers()
+    for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
+        if player ~= game:GetService('Players').LocalPlayer then
+            createTracer(player)
+        end
+    end
+end
+
+game:GetService('Players').PlayerAdded:Connect(function(player)
+    if tracerEnabled then
+        player.CharacterAdded:Connect(function()
+            wait(1)
+            createTracer(player)
+        end)
+    end
+end)
+
+game:GetService('Players').PlayerRemoving:Connect(function(player)
+    removeTracer(player)
+end)
+
+espTab.newToggle("Tracers ESP", "Draws a line to every player", true, function(toggleState)
+    tracerEnabled = toggleState
+    if toggleState then
+        print("Tracers On")
+        updateTracers()
+    else
+        print("Tracers Off")
+        for _, tracer in pairs(tracers) do
+            tracer.Visible = false
+        end
+    end
 end)
 
 -- Walkspeed function
@@ -139,7 +306,6 @@ playerTab.newToggle("Low Gravity", "Enable/Disable low gravity", false, function
     setLowGravity(toggleState)
 end)
 
-
 local NotificationHolder = loadstring(game:HttpGet("https://raw.githubusercontent.com/BocusLuke/UI/main/STX/Module.Lua"))()
 local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/BocusLuke/UI/main/STX/Client.Lua"))()
 
@@ -148,10 +314,5 @@ Notification:Notify(
     {OutlineColor = Color3.fromRGB(80, 80, 80),Time = 8, Type = "option"},
     {Image = "http://www.roblox.com/asset/?id=6023426923", ImageColor = Color3.fromRGB(255, 84, 84), Callback = function(State) print(tostring(State)) end}
 )
-
-
-
-
-
 
 print("Script loaded successfully")
