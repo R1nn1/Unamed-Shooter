@@ -3,15 +3,12 @@ local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local window = DrRayLibrary:Load("Rinns Hub", "Default")
 
 local mainTab = DrRayLibrary.newTab("Main Tab", "ImageIdHere")
-local espTab = DrRayLibrary.newTab("ESP Tab", "ImageIdHere")
 local playerTab = DrRayLibrary.newTab("Player Tab", "ImageIdHere")
 
 local hitboxEnabled = false
-local espEnabled = false
 local aimbotEnabled = false
 local wallCheckEnabled = false
 local lowGravityEnabled = false
-local tracerEnabled = false
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.5
@@ -270,17 +267,211 @@ game:GetService('Players').PlayerRemoving:Connect(function(player)
     removeTracer(player)
 end)
 
-espTab.newToggle("Tracers ESP", "Draws a line to every player", true, function(toggleState)
-    tracerEnabled = toggleState
-    if toggleState then
-        print("Tracers On")
-        updateTracers()
+-- settings
+local settings = {
+    defaultcolor = Color3.fromRGB(0, 0, 139),  -- Dark Blue
+    teamcheck = false,
+    teamcolor = true,
+    boxESPEnabled = true,
+    tracersEnabled = true,
+    distanceESPEnabled = true,
+    nameESPEnabled = true,
+    rainbowEnabled = false
+};
+
+-- services
+local runService = game:GetService("RunService");
+local players = game:GetService("Players");
+
+-- variables
+local localPlayer = players.LocalPlayer;
+local camera = workspace.CurrentCamera;
+
+-- functions
+local newVector2, newColor3, newDrawing = Vector2.new, Color3.new, Drawing.new;
+local tan, rad = math.tan, math.rad;
+local round = function(...) local a = {}; for i, v in next, table.pack(...) do a[i] = math.round(v); end return unpack(a); end;
+local wtvp = function(...) local a, b = camera.WorldToViewportPoint(camera, ...) return newVector2(a.X, a.Y), b, a.Z end;
+
+local espCache = {};
+
+local function createEsp(player)
+    local drawings = {};
+
+    drawings.box = newDrawing("Square");
+    drawings.box.Thickness = 1;
+    drawings.box.Filled = false;
+    drawings.box.Color = settings.defaultcolor;
+    drawings.box.Visible = false;
+    drawings.box.ZIndex = 2;
+
+    drawings.boxoutline = newDrawing("Square");
+    drawings.boxoutline.Thickness = 2; -- Making the outline thinner
+    drawings.boxoutline.Filled = false;
+    drawings.boxoutline.Color = newColor3();
+    drawings.boxoutline.Visible = false;
+    drawings.boxoutline.ZIndex = 1;
+
+    drawings.tracer = newDrawing("Line");
+    drawings.tracer.Thickness = 1;
+    drawings.tracer.Color = settings.defaultcolor;
+    drawings.tracer.Visible = false;
+    drawings.tracer.ZIndex = 1;
+
+    drawings.name = newDrawing("Text");
+    drawings.name.Text = player.Name;
+    drawings.name.Size = 14;
+    drawings.name.Center = true;
+    drawings.name.Outline = true;
+    drawings.name.Visible = false;
+    drawings.name.Color = settings.defaultcolor;
+
+    drawings.distance = newDrawing("Text");
+    drawings.distance.Size = 14;
+    drawings.distance.Center = true;
+    drawings.distance.Outline = true;
+    drawings.distance.Visible = false;
+    drawings.distance.Color = settings.defaultcolor;
+
+    espCache[player] = drawings;
+end
+
+local function removeEsp(player)
+    if rawget(espCache, player) then
+        for _, drawing in next, espCache[player] do
+            drawing:Remove();
+        end
+        espCache[player] = nil;
+    end
+end
+
+local function updateEsp(player, esp)
+    local character = player and player.Character;
+    if character then
+        local head = character:FindFirstChild("Head");
+        local rootPart = character:FindFirstChild("HumanoidRootPart");
+        if head and rootPart then
+            local headPos, headVisible = wtvp(head.Position);
+            local rootPos, rootVisible = wtvp(rootPart.Position);
+            local visible = headVisible and rootVisible;
+            
+            esp.box.Visible = visible and settings.boxESPEnabled;
+            esp.boxoutline.Visible = visible and settings.boxESPEnabled;
+            esp.tracer.Visible = visible and settings.tracersEnabled;
+            esp.name.Visible = visible and settings.nameESPEnabled;
+            esp.distance.Visible = visible and settings.distanceESPEnabled;
+
+            if visible then
+                local minPos, maxPos = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge);
+                for _, part in pairs(character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        local partPos = part.Position;
+                        if partPos.X < minPos.X then minPos = Vector3.new(partPos.X, minPos.Y, minPos.Z) end
+                        if partPos.Y < minPos.Y then minPos = Vector3.new(minPos.X, partPos.Y, minPos.Z) end
+                        if partPos.Z < minPos.Z then minPos = Vector3.new(minPos.X, minPos.Y, partPos.Z) end
+                        if partPos.X > maxPos.X then maxPos = Vector3.new(partPos.X, maxPos.Y, maxPos.Z) end
+                        if partPos.Y > maxPos.Y then maxPos = Vector3.new(maxPos.X, partPos.Y, maxPos.Z) end
+                        if partPos.Z > maxPos.Z then maxPos = Vector3.new(maxPos.X, maxPos.Y, partPos.Z) end
+                    end
+                end
+                local minScreenPos, _ = wtvp(minPos);
+                local maxScreenPos, _ = wtvp(maxPos);
+                local width, height = maxScreenPos.X - minScreenPos.X, maxScreenPos.Y - minScreenPos.Y;
+                local x, y = round(minScreenPos.X + width / 2, minScreenPos.Y + height / 2);
+
+                esp.box.Size = newVector2(width, height);
+                esp.box.Position = newVector2(round(x - width / 2, y - height / 2));
+                esp.box.Color = settings.teamcolor and player.TeamColor.Color or settings.defaultcolor;
+
+                esp.boxoutline.Size = esp.box.Size;
+                esp.boxoutline.Position = esp.box.Position;
+
+                local localHead = localPlayer.Character and localPlayer.Character:FindFirstChild("Head");
+                if localHead then
+                    local localHeadPos = wtvp(localHead.Position);
+                    esp.tracer.From = localHeadPos;
+                    esp.tracer.To = headPos;
+                    esp.tracer.Color = esp.box.Color;
+                end
+
+                esp.name.Position = newVector2(x, y - height / 2 - 16);
+                esp.name.Color = esp.box.Color;
+
+                local distance = (localPlayer.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude;
+                esp.distance.Text = string.format("%.0f", distance) .. "m";
+                esp.distance.Position = newVector2(x, y + height / 2 + 16);
+                esp.distance.Color = esp.box.Color;
+            end
+        end
     else
-        print("Tracers Off")
-        for _, tracer in pairs(tracers) do
-            tracer.Visible = false
+        esp.box.Visible = false;
+        esp.boxoutline.Visible = false;
+        esp.tracer.Visible = false;
+        esp.name.Visible = false;
+        esp.distance.Visible = false;
+    end
+end
+
+local function rainbowColorTransition()
+    local t = tick() * 0.1
+    return Color3.fromHSV(t % 1, 1, 1)
+end
+
+-- main
+for _, player in next, players:GetPlayers() do
+    if player ~= localPlayer then
+        createEsp(player);
+    end
+end
+
+players.PlayerAdded:Connect(function(player)
+    createEsp(player);
+end);
+
+players.PlayerRemoving:Connect(function(player)
+    removeEsp(player);
+end)
+
+runService:BindToRenderStep("esp", Enum.RenderPriority.Camera.Value, function()
+    for player, drawings in next, espCache do
+        if settings.teamcheck and player.Team == localPlayer.Team then
+            continue;
+        end
+
+        if drawings and player ~= localPlayer then
+            updateEsp(player, drawings);
+            if settings.rainbowEnabled then
+                local rainbowColor = rainbowColorTransition();
+                drawings.box.Color = rainbowColor;
+                drawings.tracer.Color = rainbowColor;
+                drawings.name.Color = rainbowColor;
+                drawings.distance.Color = rainbowColor;
+            end
         end
     end
+end)
+
+-- GUI integration
+local tab = DrRayLibrary.newTab("Esp Tab", "ImageIdHere")
+
+tab.newToggle("Box Esp", "Draws a box around every player", true, function(toggleState)
+    settings.boxESPEnabled = toggleState
+end)
+
+tab.newToggle("Tracers Esp", "Draws a line to every player", true, function(toggleState)
+    settings.tracersEnabled = toggleState
+end)
+
+tab.newToggle("Distance Esp", "Displays the distance to every player", true, function(toggleState)
+    settings.distanceESPEnabled = toggleState
+end)
+
+tab.newToggle("Name Esp", "Displays the name of every player", true, function(toggleState)
+    settings.nameESPEnabled = toggleState
+end)
+
+tab.newToggle("Rainbow Esp", "Enables rainbow color transition for ESP", false, function(toggleState)
+    settings.rainbowEnabled = toggleState
 end)
 
 -- Walkspeed function
