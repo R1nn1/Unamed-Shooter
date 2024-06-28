@@ -3,11 +3,10 @@ local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local window = DrRayLibrary:Load("Rinns Hub", "Default")
 
 local mainTab = DrRayLibrary.newTab("Main Tab", "ImageIdHere")
-local espTab = DrRayLibrary.newTab("ESP Tab", "ImageIdHere")
+
 local playerTab = DrRayLibrary.newTab("Player Tab", "ImageIdHere")
 
 local hitboxEnabled = false
-local espEnabled = false
 local aimbotEnabled = false
 local wallCheckEnabled = false
 local lowGravityEnabled = false
