@@ -3,12 +3,15 @@ local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local window = DrRayLibrary:Load("Rinns Hub", "Default")
 
 local mainTab = DrRayLibrary.newTab("Main Tab", "ImageIdHere")
+local espTab = DrRayLibrary.newTab("ESP Tab", "ImageIdHere")
 local playerTab = DrRayLibrary.newTab("Player Tab", "ImageIdHere")
 
 local hitboxEnabled = false
+local espEnabled = false
 local aimbotEnabled = false
 local wallCheckEnabled = false
 local lowGravityEnabled = false
+local tracerEnabled = false
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.5
@@ -147,135 +150,15 @@ mainTab.newToggle("Wall Check", "Makes the aimbot check if players are behind a 
     end
 end)
 
--- ESP function
-local function addHighlight(player)
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "HighlightESP"
-        highlight.FillColor = Color3.new(1, 0, 0)
-        highlight.OutlineColor = Color3.new(1, 1, 1)
-        highlight.FillTransparency = 0.5
-        highlight.OutlineTransparency = 0
-        highlight.Parent = player.Character.HumanoidRootPart
-    end
-end
-
-local function removeHighlight(player)
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart:FindFirstChild("HighlightESP") then
-        player.Character.HumanoidRootPart.HighlightESP:Destroy()
-    end
-end
-
-local function updateESP()
-    for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
-        if player ~= game:GetService('Players').LocalPlayer then
-            if espEnabled then
-                addHighlight(player)
-            else
-                removeHighlight(player)
-            end
-        end
-    end
-end
-
-game:GetService('Players').PlayerAdded:Connect(function(player)
-    if espEnabled then
-        player.CharacterAdded:Connect(function()
-            wait(1)
-            addHighlight(player)
-        end)
-    end
-end)
-
-game:GetService('Players').PlayerRemoving:Connect(function(player)
-    removeHighlight(player)
-end)
-
-espTab.newToggle("Highlight ESP", "Highlights all players", true, function(toggleState)
-    espEnabled = toggleState
-    getgenv().ESPStatus = toggleState
-    if toggleState then
-        print("ESP On")
-    else
-        print("ESP Off")
-    end
-    updateESP()
-end)
-
--- Tracers function
-local tracers = {}
-
-local function createTracer(player)
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-    
-    local tracer = Drawing.new("Line")
-    tracer.Visible = false
-    tracer.Color = Color3.new(1, 0, 0)
-    tracer.Thickness = 2
-    tracer.Transparency = 1
-    
-    tracers[player] = tracer
-
-    local function updateTracer()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-            local camera = game:GetService("Workspace").CurrentCamera
-            local screenPoint = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            tracer.From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y)
-            tracer.To = Vector2.new(screenPoint.X, screenPoint.Y)
-            tracer.Visible = tracerEnabled and player.Character.Humanoid.Health > 0
-        else
-            tracer.Visible = false
-        end
-    end
-
-    game:GetService("RunService").RenderStepped:Connect(updateTracer)
-
-    player.CharacterAdded:Connect(function()
-        wait(1)
-        updateTracer()
-        player.Character:WaitForChild("Humanoid").Died:Connect(function()
-            tracer.Visible = false
-        end)
-    end)
-end
-
-local function removeTracer(player)
-    if tracers[player] then
-        tracers[player].Visible = false
-        tracers[player] = nil
-    end
-end
-
-local function updateTracers()
-    for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
-        if player ~= game:GetService('Players').LocalPlayer then
-            createTracer(player)
-        end
-    end
-end
-
-game:GetService('Players').PlayerAdded:Connect(function(player)
-    if tracerEnabled then
-        player.CharacterAdded:Connect(function()
-            wait(1)
-            createTracer(player)
-        end)
-    end
-end)
-
-game:GetService('Players').PlayerRemoving:Connect(function(player)
-    removeTracer(player)
-end)
-
 -- settings
 local settings = {
     defaultcolor = Color3.fromRGB(0, 0, 139),  -- Dark Blue
     teamcheck = false,
     teamcolor = true,
-    boxESPEnabled = true,
-    tracersEnabled = true,
-    distanceESPEnabled = true,
-    nameESPEnabled = true,
+    boxESPEnabled = false,
+    tracersEnabled = false,
+    distanceESPEnabled = false,
+    nameESPEnabled = false,
     rainbowEnabled = false
 };
 
