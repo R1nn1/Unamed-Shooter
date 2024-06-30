@@ -3,17 +3,19 @@ local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local window = DrRayLibrary:Load("Rinns Hub", "Default")
 
 local mainTab = DrRayLibrary.newTab("Main Tab", "ImageIdHere")
-
 local playerTab = DrRayLibrary.newTab("Player Tab", "ImageIdHere")
 
 local hitboxEnabled = false
+local espEnabled = false
 local aimbotEnabled = false
+local rainbowEnabled = false
 local wallCheckEnabled = false
 local lowGravityEnabled = false
 local tracerEnabled = false
 
 getgenv().HitboxSize = 15
 getgenv().HitboxTransparency = 0.5
+getgenv().AimbotCircleSize = 100
 
 -- Hitbox function
 local function updateHitbox()
@@ -50,14 +52,21 @@ local function createCircle()
     local circle = Drawing.new("Circle")
     circle.Thickness = 2
     circle.NumSides = 30
-    circle.Radius = 100
+    circle.Radius = getgenv().AimbotCircleSize
     circle.Color = Color3.new(1, 1, 1)
     circle.Transparency = 0.4
     circle.Filled = false
 
     game:GetService('RunService').RenderStepped:Connect(function()
+        circle.Radius = getgenv().AimbotCircleSize
         if aimbotEnabled then
             circle.Position = Vector2.new(game:GetService('Workspace').CurrentCamera.ViewportSize.X / 2, game:GetService('Workspace').CurrentCamera.ViewportSize.Y / 2)
+            if rainbowEnabled then
+                local hue = tick() % 5 / 5
+                circle.Color = Color3.fromHSV(hue, 1, 1)
+            else
+                circle.Color = Color3.new(1, 1, 1)
+            end
             circle.Visible = true
         else
             circle.Visible = false
@@ -69,7 +78,7 @@ createCircle()
 
 local function getClosestPlayer()
     local closestPlayer = nil
-    local shortestDistance = 100
+    local shortestDistance = getgenv().AimbotCircleSize
 
     for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
         if player ~= game:GetService('Players').LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
@@ -131,12 +140,26 @@ mainTab.newSlider("HitBox Slider", "Lets you change how big other players hitbox
     print("Hitbox size:", num)
 end)
 
+mainTab.newSlider("Aimbot Circle Size", "Lets you change how big the aimbot circle is", 200, false, function(num)
+    getgenv().AimbotCircleSize = num
+    print("Aimbot circle size:", num)
+end)
+
 mainTab.newToggle("Aimbot", "Locks your camera on to players in the circle", true, function(toggleState)
     aimbotEnabled = toggleState
     if toggleState then
         print("Aimbot On")
     else
         print("Aimbot Off")
+    end
+end)
+
+mainTab.newToggle("Rainbow Aimbot Circle", "Makes the aimbot circle transition rainbow colors", true, function(toggleState)
+    rainbowEnabled = toggleState
+    if toggleState then
+        print("Rainbow Aimbot Circle On")
+    else
+        print("Rainbow Aimbot Circle Off")
     end
 end)
 
@@ -389,12 +412,3 @@ Notification:Notify(
 )
 
 print("Script loaded successfully")
-
-local NotificationHolder = loadstring(game:HttpGet("https://raw.githubusercontent.com/BocusLuke/UI/main/STX/Module.Lua"))()
-local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/BocusLuke/UI/main/STX/Client.Lua"))()
-
-Notification:Notify(
-    {Title = "IMPORTANT", Description = "this scirpt is currently being worked on expect it to be fully updated by tomorrow or today"},
-    {OutlineColor = Color3.fromRGB(80, 80, 80),Time = 8, Type = "option"},
-    {Image = "http://www.roblox.com/asset/?id=6023426923", ImageColor = Color3.fromRGB(255, 84, 84), Callback = function(State) print(tostring(State)) end}
-)
